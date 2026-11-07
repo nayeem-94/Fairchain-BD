@@ -1,57 +1,39 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { api, store } from '../lib/api.js'
 
-import { createContext, useContext, useState } from "react";
-import { api, TOKEN_KEY, USER_KEY } from "../api/client";
-
-const AuthContext = createContext(null);
-
-export const useAuth = () => useContext(AuthContext);
+const Ctx = createContext(null)
+export const useAuth = () => useContext(Ctx)
 
 export function AuthProvider({ children }) {
+  const [user, setUser] = useState(() => store.get()?.user || null)
 
-  const [user, setUser] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(USER_KEY));
-    } catch {
-      return null;
-    }
-  });
+  useEffect(() => {
+    const out = () => setUser(null)
+    window.addEventListener('fc:logout', out)
+    return () => window.removeEventListener('fc:logout', out)
+  }, [])
 
-  async function login(username, password) {
+  // Refresh the profile in the background (older deployed backends may not have /api/me/).
+  useEffect(() => {
+    if (!store.get()?.access) return
+    api.get('/api/me/').then((me) => {
+      const a = store.get()
+      if (a) store.set({ ...a, user: me })
+      setUser(me)
+    }).catch(() => {})
+  }, [])
 
-    const data = await api("/api/login/", {
-      method: "POST",
-      body: { username, password },
-      auth: false
-    });
+  const login = useCallback(async (username, password) => {
+    const u = await api.login(username, password)
+    setUser(u)
+    return u
+  }, [])
 
-    const token = data.access;
+  const logout = useCallback(() => {
+    store.clear()
+    setUser(null)
+  }, [])
 
-    if (!token) {
-      throw new Error("Token not found");
-    }
-
-    const next = {
-      username: data.user.username,
-      role: data.user.user_type
-    };
-
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(next));
-
-    setUser(next);
-
-    return next;
-  }
-
-  function logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    setUser(null);
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = useMemo(() => ({ user, setUser, login, logout }), [user, login, logout])
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

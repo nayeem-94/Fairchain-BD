@@ -1,74 +1,65 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import ProtectedRoute from "./components/ProtectedRoute";
-import { CHAIN } from "./config/nav";
+import { Suspense, lazy } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { useAuth } from './context/AuthContext.jsx'
+import Layout, { NAV } from './components/Layout.jsx'
+import Landing from './pages/Landing.jsx'
+import Login from './pages/Login.jsx'
+import Register from './pages/Register.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Products from './pages/Products.jsx'
+import Imports from './pages/Imports.jsx'
+import Productions from './pages/Productions.jsx'
+import Batches from './pages/Batches.jsx'
+import Inventory from './pages/Inventory.jsx'
+import Transfers from './pages/Transfers.jsx'
+import Prices from './pages/Prices.jsx'
+import ReferencePrices from './pages/ReferencePrices.jsx'
+import Reports from './pages/Reports.jsx'
+import Expiry from './pages/Expiry.jsx'
+import Profile from './pages/Profile.jsx' 
 
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import DashboardLayout from "./pages/dashboard/DashboardLayout";
-import Overview from "./pages/dashboard/Overview";
-import Analytics from "./pages/dashboard/Analytics";
-import Products from "./pages/dashboard/Products";
-import Imports from "./pages/dashboard/Imports";
-import Production from "./pages/dashboard/Production";
-import Inventory from "./pages/dashboard/Inventory";
-import Transfers from "./pages/dashboard/Transfers";
-import Prices from "./pages/dashboard/Prices";
-import ExpiryAlerts from "./pages/dashboard/ExpiryAlerts";
-import MyReports from "./pages/dashboard/MyReports";
-import AdminReports from "./pages/dashboard/admin/AdminReports";
-import AdminAlerts from "./pages/dashboard/admin/AdminAlerts";
-import AdminMonitor from "./pages/dashboard/admin/AdminMonitor";
-import AdminReferencePrices from "./pages/dashboard/admin/AdminReferencePrices";
-// import RoleBasedRedirect from "./components/RoleBasedRedirect";
+// Chart pages load on demand so the first screen stays small.
+const PriceCheck = lazy(() => import('./pages/PriceCheck.jsx'))
+const Analytics = lazy(() => import('./pages/Analytics.jsx'))
+
+function Protected({ children }) {
+  const { user } = useAuth()
+  return user ? children : <Navigate to="/login" replace />
+}
+
+// Send people away from pages their role cannot use (the API would answer 403 anyway).
+function Only({ path, children }) {
+  const { user } = useAuth()
+  const allowed = (NAV[user.user_type] || []).some((i) => i.to === path)
+  return allowed ? <Suspense fallback={<p className="py-10 text-mute">Loading</p>}>{children}</Suspense> : <Navigate to="/app" replace />
+}
+
+const guard = (path, el) => <Only path={path}>{el}</Only>
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
-          <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<DashboardLayout />}>
-              <Route index element={<Overview />} />
-              <Route path="analytics" element={<Analytics />} />
-
-              <Route element={<ProtectedRoute roles={["importer", "manufacturer", "admin"]} />}>
-                <Route path="products" element={<Products />} />
-              </Route>
-              <Route element={<ProtectedRoute roles={["importer"]} />}>
-                <Route path="imports" element={<Imports />} />
-              </Route>
-              <Route element={<ProtectedRoute roles={["manufacturer"]} />}>
-                <Route path="production" element={<Production />} />
-              </Route>
-              <Route element={<ProtectedRoute roles={CHAIN} />}>
-                <Route path="inventory" element={<Inventory />} />
-                <Route path="transfers" element={<Transfers />} />
-                <Route path="prices" element={<Prices />} />
-                <Route path="expiry-alerts" element={<ExpiryAlerts />} />
-              </Route>
-              <Route element={<ProtectedRoute roles={["citizen"]} />}>
-                <Route path="my-reports" element={<MyReports />} />
-              </Route>
-              <Route element={<ProtectedRoute roles={["admin"]} />}>
-                <Route path="admin/reports" element={<AdminReports />} />
-                <Route path="admin/expiry-alerts" element={<AdminAlerts />} />
-                <Route path="admin/monitor" element={<AdminMonitor />} />
-                <Route path="admin/reference-prices" element={<AdminReferencePrices />} />
-              </Route>
-
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Route>
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
-  );
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/app" element={<Protected><Layout /></Protected>}>
+        <Route index element={<Dashboard />} />
+        <Route path="products" element={guard('/app/products', <Products />)} />
+        <Route path="imports" element={guard('/app/imports', <Imports />)} />
+        <Route path="productions" element={guard('/app/productions', <Productions />)} />
+        <Route path="batches" element={guard('/app/batches', <Batches />)} />
+        <Route path="inventory" element={guard('/app/inventory', <Inventory />)} />
+        <Route path="transfers" element={guard('/app/transfers', <Transfers />)} />
+        <Route path="prices" element={guard('/app/prices', <Prices />)} />
+        <Route path="price-check" element={guard('/app/price-check', <PriceCheck />)} />
+        <Route path="reference-prices" element={guard('/app/reference-prices', <ReferencePrices />)} />
+        <Route path="reports" element={guard('/app/reports', <Reports />)} />
+        <Route path="expiry" element={guard('/app/expiry', <Expiry />)} />
+        <Route path="analytics" element={guard('/app/analytics', <Analytics />)} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="*" element={<Navigate to="/app" replace />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
 }

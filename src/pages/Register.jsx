@@ -1,193 +1,81 @@
+import { useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import Brand from '../components/Brand.jsx'
+import { Button, ErrorNote, Field, useToast } from '../components/ui.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { api } from '../lib/api.js'
 
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import AuthLayout from "../components/AuthLayout";
-import { api, errorMessage } from "../api/client";
-import { REGISTER_ROLES, ROLE_LABELS } from "../config/nav";
-import { FIELD, BTN } from "../components/ui/styles";
+const ROLE_HELP = {
+  importer: 'You bring goods into Bangladesh.',
+  manufacturer: 'You process or pack goods in a factory.',
+  distributor: 'You move goods from factories to wholesalers.',
+  wholesaler: 'You sell in bulk to retailers.',
+  retailer: 'You sell to shoppers in a shop or market.',
+  citizen: 'You buy goods and want to check prices.',
+}
 
 export default function Register() {
-  const navigate = useNavigate();
+  const { user, login } = useAuth()
+  const nav = useNavigate()
+  const toast = useToast()
+  const [f, setF] = useState({ username: '', email: '', password: '', user_type: '', phone: '', address: '' })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
 
-  const [form, setForm] = useState({
-    username: "",
-    email: "",
-    user_type: "",
-    phone: "",
-    address: "",
-    password: "",
-    confirm: "",
-  });
+  if (user) return <Navigate to="/app" replace />
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  const fe = (k) => (error?.fields?.[k] ? [].concat(error.fields[k]).join(' ') : null)
 
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const set = (k) => (e) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  async function submit(e) {
-    e.preventDefault();
-    setError("");
-
-    if (form.password.length < 8) {
-      setError("Use a password with at least 8 characters.");
-      return;
-    }
-
-    if (form.password !== form.confirm) {
-      setError("The two passwords do not match.");
-      return;
-    }
-
-    setBusy(true);
-
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
     try {
-      await api("/api/register/", {
-        method: "POST",
-        auth: false,
-        body: {
-          username: form.username.trim(),
-          email: form.email.trim(),
-          password: form.password,
-          user_type: form.user_type,
-          phone: form.phone.trim(),
-          address: form.address.trim(),
-        },
-      });
-
-      navigate("/login", {
-        replace: true,
-        state: { registered: true },
-      });
+      await api.register({ ...f, username: f.username.trim() })
+      await login(f.username.trim(), f.password)
+      toast('Account created. Welcome to FairChain BD.')
+      nav('/app', { replace: true })
     } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
+      setError(err)
+      setBusy(false)
     }
   }
 
+  const fieldKeys = ['username', 'email', 'password', 'user_type', 'phone', 'address']
+  const showGeneral = error && !fieldKeys.some((k) => error.fields?.[k])
+
   return (
-    <AuthLayout
-      title="Create an account"
-      subtitle="Choose the role that matches what you do. You can report prices as a citizen or log stock as part of the supply chain."
-      footer={
-        <>
-          Already registered?{" "}
-          <Link
-            to="/login"
-            className="font-semibold text-jade underline"
-          >
-            Log in
-          </Link>
-        </>
-      }
-    >
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium">
-            Username
-            <input
-              required
-              autoComplete="username"
-              value={form.username}
-              onChange={set("username")}
-              className={`${FIELD} mt-1`}
-            />
-          </label>
-
-          <label className="block text-sm font-medium">
-            Email
-            <input
-              required
-              type="email"
-              autoComplete="email"
-              value={form.email}
-              onChange={set("email")}
-              className={`${FIELD} mt-1`}
-            />
-          </label>
-        </div>
-
-        <label className="block text-sm font-medium">
-          I am a
-          <select
-            required
-            value={form.user_type}
-            onChange={set("user_type")}
-            className={`${FIELD} mt-1`}
-          >
-            {REGISTER_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
-              </option>
-            ))}
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+      <Link to="/" className="mb-8"><Brand /></Link>
+      <form onSubmit={submit} className="grid w-full max-w-lg gap-4 rounded-lg border border-line bg-panel p-6 sm:grid-cols-2">
+        <h1 className="text-2xl font-semibold sm:col-span-2">Create your account</h1>
+        <Field label="I am a" error={fe('user_type')} help={ROLE_HELP[f.user_type]} full>
+          <select className="input" required value={f.user_type} onChange={set('user_type')}>
+            <option value="">Choose your role</option>
+            {Object.keys(ROLE_HELP).map((r) => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
           </select>
-        </label>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium">
-            Phone
-            <input
-              required
-              type="tel"
-              autoComplete="tel"
-              value={form.phone}
-              onChange={set("phone")}
-              className={`${FIELD} mt-1`}
-            />
-          </label>
-
-          <label className="block text-sm font-medium">
-            Address
-            <input
-              required
-              autoComplete="street-address"
-              value={form.address}
-              onChange={set("address")}
-              className={`${FIELD} mt-1`}
-            />
-          </label>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium">
-            Password
-            <input
-              required
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              value={form.password}
-              onChange={set("password")}
-              className={`${FIELD} mt-1`}
-            />
-          </label>
-
-          <label className="block text-sm font-medium">
-            Confirm password
-            <input
-              required
-              type="password"
-              autoComplete="new-password"
-              value={form.confirm}
-              onChange={set("confirm")}
-              className={`${FIELD} mt-1`}
-            />
-          </label>
-        </div>
-
-        <button
-          type="submit"
-          disabled={busy}
-          className={`${BTN} w-full py-3`}
-        >
-          {busy ? "Creating account..." : "Create account"}
-        </button>
-
-        <p role="alert" className="min-h-5 text-sm text-signal">
-          {error}
+        </Field>
+        <Field label="Username" error={fe('username')}>
+          <input className="input" autoComplete="username" required value={f.username} onChange={set('username')} />
+        </Field>
+        <Field label="Email" error={fe('email')}>
+          <input className="input" type="email" autoComplete="email" value={f.email} onChange={set('email')} />
+        </Field>
+        <Field label="Password" error={fe('password')} help="At least 8 characters, not only digits." full>
+          <input className="input" type="password" autoComplete="new-password" required minLength={8} value={f.password} onChange={set('password')} />
+        </Field>
+        <Field label="Phone" error={fe('phone')}>
+          <input className="input" inputMode="tel" value={f.phone} onChange={set('phone')} />
+        </Field>
+        <Field label="Address" error={fe('address')}>
+          <input className="input" autoComplete="street-address" value={f.address} onChange={set('address')} />
+        </Field>
+        {showGeneral && <div className="sm:col-span-2"><ErrorNote error={error} /></div>}
+        <Button type="submit" busy={busy} className="sm:col-span-2">Create account</Button>
+        <p className="text-center text-sm text-mute sm:col-span-2">
+          Already registered? <Link to="/login" className="font-semibold text-paddy underline">Log in</Link>
         </p>
       </form>
-    </AuthLayout>
-  );
+    </div>
+  )
 }

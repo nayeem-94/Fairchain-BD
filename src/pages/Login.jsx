@@ -1,134 +1,48 @@
-
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import AuthLayout from "../components/AuthLayout";
-import { useAuth } from "../context/AuthContext";
-import { errorMessage } from "../api/client";
-import { FIELD, BTN } from "../components/ui/styles";
-import { Eye, EyeOff } from "lucide-react";
+import { useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import Brand from '../components/Brand.jsx'
+import { Button, ErrorNote, Field } from '../components/ui.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Login() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { user, login } = useAuth()
+  const nav = useNavigate()
+  const [form, setForm] = useState({ username: '', password: '' })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
 
-  const [form, setForm] = useState({
-    username: "",
-    password: ""
-  });
+  if (user) return <Navigate to="/app" replace />
 
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  const set = (k) => (e) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  async function submit(e) {
-    e.preventDefault();
-
-    setBusy(true);
-    setError("");
-
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
     try {
-      await login(form.username.trim(), form.password);
-
-      navigate("/dashboard", { replace: true });
-
+      await login(form.username.trim(), form.password)
+      nav('/app', { replace: true })
     } catch (err) {
-      setError(
-        err.status === 400 || err.status === 401
-          ? "The username or password is incorrect."
-          : err.status
-          ? errorMessage(err)
-          : err.message
-      );
-
-      setBusy(false);
+      setError(err.status === 401 ? { message: 'Wrong username or password.' } : err)
+      setBusy(false)
     }
   }
 
   return (
-    <AuthLayout
-      title="Log in"
-      subtitle={
-        location.state?.registered
-          ? "Your account is ready. Log in to continue."
-          : "Use the account you registered with."
-      }
-      footer={
-        <>
-          New to FairChain?{" "}
-          <Link
-            to="/register"
-            className="font-semibold text-jade underline"
-          >
-            Create an account
-          </Link>
-        </>
-      }
-    >
-      <form onSubmit={submit} className="space-y-4">
-
-        <label className="block text-sm font-medium">
-          Username
-
-          <input
-            required
-            autoComplete="username"
-            value={form.username}
-            onChange={set("username")}
-            className={`${FIELD} mt-1`}
-          />
-        </label>
-
-        <label className="block text-sm font-medium">
-          Password
-
-          <div className="relative mt-1">
-            <input
-              required
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              value={form.password}
-              onChange={set("password")}
-              className={`${FIELD} w-full pr-12`}
-            />
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowPassword((prev) => !prev)
-              }
-              className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-jade"
-              aria-label={
-                showPassword ? "Hide password" : "Show password"
-              }
-            >
-              {showPassword
-                ? <EyeOff size={20} />
-                : <Eye size={20} />
-              }
-            </button>
-          </div>
-        </label>
-
-        <button
-          type="submit"
-          disabled={busy}
-          className={`${BTN} w-full py-3`}
-        >
-          {busy
-            ? "Logging in. The server may be waking up."
-            : "Log in"
-          }
-        </button>
-
-        <p role="alert" className="min-h-5 text-sm text-signal">
-          {error}
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+      <Link to="/" className="mb-8"><Brand /></Link>
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-lg border border-line bg-panel p-6">
+        <h1 className="text-2xl font-semibold">Log in</h1>
+        <Field label="Username">
+          <input className="input" autoComplete="username" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        </Field>
+        <Field label="Password">
+          <input className="input" type="password" autoComplete="current-password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        </Field>
+        <ErrorNote error={error} />
+        <Button type="submit" busy={busy} className="w-full">Log in</Button>
+        <p className="text-center text-sm text-mute">
+          New here? <Link to="/register" className="font-semibold text-paddy underline">Create an account</Link>
         </p>
-
       </form>
-    </AuthLayout>
-  );
+    </div>
+  )
 }
